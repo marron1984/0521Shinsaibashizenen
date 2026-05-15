@@ -26,35 +26,12 @@ L2=("名物 すき焼き"      "職人の手しごと"     "旨みがあふれ�
 
 N=${#IMAGES[@]}
 
-# ---------- 音声: ジャズ風メロウパッド (合成 / 著作権フリー) ----------
-# ii-V-I 進行 ( Dm7 - G7 - Cmaj7 - Am7 ) を1コード約3.45秒で生成しループ
-make_chord () {
-  local name="$1"; shift
-  local freqs=("$@")
-  local inputs=() maps=() idx=0
-  for f in "${freqs[@]}"; do
-    inputs+=( -f lavfi -i "sine=frequency=${f}:duration=3.45:sample_rate=44100" )
-    maps+=("[$idx]")
-    idx=$((idx+1))
-  done
-  ffmpeg -y -loglevel error "${inputs[@]}" \
-    -filter_complex "$(printf '%s' "${maps[@]}")amix=inputs=${idx}:normalize=1,\
-volume=0.55,tremolo=f=4.2:d=0.35,lowpass=f=1900,highpass=f=90,\
-aecho=0.8:0.7:60|140:0.35|0.22,\
-afade=t=in:st=0:d=0.25,afade=t=out:st=3.05:d=0.4,aformat=sample_rates=44100:channel_layouts=stereo" \
-    -t 3.45 "$TMP/chord_${name}.wav"
-}
-
-make_chord Dm7  293.66 349.23 440.00 523.25
-make_chord G7   196.00 246.94 293.66 349.23
-make_chord Cmaj 261.63 329.63 392.00 493.88
-make_chord Am7  220.00 261.63 329.63 392.00
-
-# コードを連結 → ループして全長分の音楽を作成
-printf "file '%s'\n" "$TMP/chord_Dm7.wav" "$TMP/chord_G7.wav" "$TMP/chord_Cmaj.wav" "$TMP/chord_Am7.wav" > "$TMP/audio_list.txt"
+# ---------- 音声: リポジトリ内の MP3 を BGM に採用 ----------
+BGM="$ROOT/Midnight_on_the_Terrace.mp3"
 TOTAL=$(echo "($N - 1) * $STEP + $DL" | bc)
-ffmpeg -y -loglevel error -stream_loop 6 -f concat -safe 0 -i "$TMP/audio_list.txt" \
-  -af "aloop=loop=0:size=0,volume=0.9,afade=t=in:st=0:d=1.0,afade=t=out:st=$(echo "$TOTAL - 1.5" | bc):d=1.5" \
+# 動画尺に満たない場合に備えループ → 全長で切り出し、フェードイン/アウト
+ffmpeg -y -loglevel error -stream_loop -1 -i "$BGM" \
+  -af "volume=0.85,afade=t=in:st=0:d=1.2,afade=t=out:st=$(echo "$TOTAL - 1.8" | bc):d=1.8,aformat=sample_rates=44100:channel_layouts=stereo" \
   -t "$TOTAL" "$TMP/music.wav"
 
 # ---------- 動画: 各カットを生成 (ぼかし背景 + フィット + ゆるやかズーム + テロップ) ----------
