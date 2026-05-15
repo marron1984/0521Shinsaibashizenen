@@ -15,13 +15,14 @@ FONT_TITLE="$ROOT/assets/fonts/NotoSerifJP-Bold.ttf"
 FONT_SUB="$ROOT/assets/fonts/NotoSansJP-Medium.ttf"
 W=1080; H=1920; FPS=30
 D=3.6          # 1カットの尺(秒)
+DL=5.0         # 最終ページ(予約QRカード)の表示尺(秒) ※QR読み取りのため長め
 T=0.6          # トランジション(秒)
 STEP=$(echo "$D - $T" | bc)
 
-# 画像 と キャプション (line1 / line2)
-IMAGES=(240619_0049.jpg 240619_0044.jpg 240619_0041.jpg 240619_0055.jpg 240619_0050.jpg 240619_0051.jpg 240619_0052.jpg 240619_0053.jpg 240619_0048.jpg)
-L1=("心斎橋  禅園"      "厳選和牛を一枚ずつ" "とろける霜降り"   "目の前で仕上げる" "熱々を卵に"     "口の中でほどける" "〆は出汁を吸った" "最後の一滴まで" "この席は、ここだけ。")
-L2=("名物 すき焼き"      "職人の手しごと"     "旨みがあふれる"   "特製の割下"       "くぐらせて"     "和牛の旨み"       "うどんで"         "ご馳走さま"     "ご予約はプロフィールから")
+# 画像 と キャプション (line1 / line2) ※最終ページはデザイン済みカードのため文字なし
+IMAGES=(240619_0049.jpg 240619_0044.jpg 240619_0041.jpg 240619_0055.jpg 240619_0050.jpg 240619_0051.jpg 240619_0052.jpg 240619_0053.jpg 240619_0048.jpg S__2719760_0.jpg)
+L1=("心斎橋  禅園"      "厳選和牛を一枚ずつ" "とろける霜降り"   "目の前で仕上げる" "熱々を卵に"     "口の中でほどける" "〆は出汁を吸った" "最後の一滴まで" "この席は、ここだけ。" "")
+L2=("名物 すき焼き"      "職人の手しごと"     "旨みがあふれる"   "特製の割下"       "くぐらせて"     "和牛の旨み"       "うどんで"         "ご馳走さま"     "今宵、特別な一席を" "")
 
 N=${#IMAGES[@]}
 
@@ -51,7 +52,7 @@ make_chord Am7  220.00 261.63 329.63 392.00
 
 # コードを連結 → ループして全長分の音楽を作成
 printf "file '%s'\n" "$TMP/chord_Dm7.wav" "$TMP/chord_G7.wav" "$TMP/chord_Cmaj.wav" "$TMP/chord_Am7.wav" > "$TMP/audio_list.txt"
-TOTAL=$(echo "$N * $D - ($N - 1) * $T" | bc)
+TOTAL=$(echo "($N - 1) * $STEP + $DL" | bc)
 ffmpeg -y -loglevel error -stream_loop 6 -f concat -safe 0 -i "$TMP/audio_list.txt" \
   -af "aloop=loop=0:size=0,volume=0.9,afade=t=in:st=0:d=1.0,afade=t=out:st=$(echo "$TOTAL - 1.5" | bc):d=1.5" \
   -t "$TOTAL" "$TMP/music.wav"
@@ -63,15 +64,24 @@ for i in $(seq 0 $((N-1))); do
   img="$ROOT/${IMAGES[$i]}"
   t1="$(esc "${L1[$i]}")"
   t2="$(esc "${L2[$i]}")"
-  # 偶数カットはズームイン、奇数カットはズームアウトで変化をつける
-  if [ $((i % 2)) -eq 0 ]; then
-    ZEXP="1.0+0.0009*in"
-  else
-    ZEXP="1.10-0.0009*in"
-  fi
-  FR=$(echo "$D * $FPS / 1" | bc)
 
-  ffmpeg -y -loglevel error -loop 1 -framerate $FPS -t "$D" -i "$img" \
+  if [ "$i" -eq $((N-1)) ]; then
+    # 最終ページ: 予約QRカード → 静止・テロップなし・長め表示 (QR読み取り用)
+    CLIPDUR="$DL"
+    ZEXP="1.0"
+    TEXTCHAIN="format=yuv420p[v]"
+  else
+    CLIPDUR="$D"
+    # 偶数カットはズームイン、奇数カットはズームアウトで変化をつける
+    if [ $((i % 2)) -eq 0 ]; then
+      ZEXP="1.0+0.0009*in"
+    else
+      ZEXP="1.10-0.0009*in"
+    fi
+    TEXTCHAIN="drawtext=fontfile='${FONT_TITLE}':text='${t1}':fontcolor=white:fontsize=84:borderw=5:bordercolor=black@0.55:shadowcolor=black@0.5:shadowx=2:shadowy=3:x=(w-text_w)/2:y=h-360:alpha='if(lt(t,0.4),t/0.4,if(gt(t,${D}-0.5),(${D}-t)/0.5,1))',drawtext=fontfile='${FONT_SUB}':text='${t2}':fontcolor=white:fontsize=52:borderw=4:bordercolor=black@0.55:shadowcolor=black@0.5:shadowx=2:shadowy=2:x=(w-text_w)/2:y=h-248:alpha='if(lt(t,0.5),t/0.5,if(gt(t,${D}-0.5),(${D}-t)/0.5,1))',format=yuv420p[v]"
+  fi
+
+  ffmpeg -y -loglevel error -loop 1 -framerate $FPS -t "$CLIPDUR" -i "$img" \
     -filter_complex "
       [0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=28,eq=brightness=-0.07:saturation=1.05[bg];
       [0:v]scale=${W}:${H}:force_original_aspect_ratio=decrease[fg];
@@ -79,10 +89,8 @@ for i in $(seq 0 $((N-1))); do
       [base]zoompan=z='${ZEXP}':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${W}x${H}:fps=${FPS}[zp];
       [zp]eq=saturation=1.08:contrast=1.04,
           drawbox=x=0:y=ih-560:w=iw:h=560:color=black@0.0:t=fill,
-          drawtext=fontfile='${FONT_TITLE}':text='${t1}':fontcolor=white:fontsize=84:borderw=5:bordercolor=black@0.55:shadowcolor=black@0.5:shadowx=2:shadowy=3:x=(w-text_w)/2:y=h-360:alpha='if(lt(t,0.4),t/0.4,if(gt(t,${D}-0.5),(${D}-t)/0.5,1))',
-          drawtext=fontfile='${FONT_SUB}':text='${t2}':fontcolor=white:fontsize=52:borderw=4:bordercolor=black@0.55:shadowcolor=black@0.5:shadowx=2:shadowy=2:x=(w-text_w)/2:y=h-248:alpha='if(lt(t,0.5),t/0.5,if(gt(t,${D}-0.5),(${D}-t)/0.5,1))',
-          format=yuv420p[v]
-    " -map "[v]" -r $FPS -c:v libx264 -preset medium -crf 18 -t "$D" "$TMP/clip_$i.mp4"
+          ${TEXTCHAIN}
+    " -map "[v]" -r $FPS -c:v libx264 -preset medium -crf 18 -t "$CLIPDUR" "$TMP/clip_$i.mp4"
 done
 
 # ---------- xfade で連結 ----------
