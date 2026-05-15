@@ -10,7 +10,9 @@ OUT="$ROOT/output"
 TMP="$ROOT/.build_tmp"
 mkdir -p "$OUT" "$TMP"
 
-FONT="/usr/share/fonts/opentype/ipafont-gothic/ipagp.ttf"
+# ダウンロードした Noto JP フォント (見出し=明朝太 / 補足=ゴシック)
+FONT_TITLE="$ROOT/assets/fonts/NotoSerifJP-Bold.ttf"
+FONT_SUB="$ROOT/assets/fonts/NotoSansJP-Medium.ttf"
 W=1080; H=1920; FPS=30
 D=3.6          # 1カットの尺(秒)
 T=0.6          # トランジション(秒)
@@ -77,8 +79,8 @@ for i in $(seq 0 $((N-1))); do
       [base]zoompan=z='${ZEXP}':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${W}x${H}:fps=${FPS}[zp];
       [zp]eq=saturation=1.08:contrast=1.04,
           drawbox=x=0:y=ih-560:w=iw:h=560:color=black@0.0:t=fill,
-          drawtext=fontfile='${FONT}':text='${t1}':fontcolor=white:fontsize=82:borderw=5:bordercolor=black@0.55:shadowcolor=black@0.5:shadowx=2:shadowy=3:x=(w-text_w)/2:y=h-360:alpha='if(lt(t,0.4),t/0.4,if(gt(t,${D}-0.5),(${D}-t)/0.5,1))',
-          drawtext=fontfile='${FONT}':text='${t2}':fontcolor=white:fontsize=52:borderw=4:bordercolor=black@0.55:shadowcolor=black@0.5:shadowx=2:shadowy=2:x=(w-text_w)/2:y=h-250:alpha='if(lt(t,0.5),t/0.5,if(gt(t,${D}-0.5),(${D}-t)/0.5,1))',
+          drawtext=fontfile='${FONT_TITLE}':text='${t1}':fontcolor=white:fontsize=84:borderw=5:bordercolor=black@0.55:shadowcolor=black@0.5:shadowx=2:shadowy=3:x=(w-text_w)/2:y=h-360:alpha='if(lt(t,0.4),t/0.4,if(gt(t,${D}-0.5),(${D}-t)/0.5,1))',
+          drawtext=fontfile='${FONT_SUB}':text='${t2}':fontcolor=white:fontsize=52:borderw=4:bordercolor=black@0.55:shadowcolor=black@0.5:shadowx=2:shadowy=2:x=(w-text_w)/2:y=h-248:alpha='if(lt(t,0.5),t/0.5,if(gt(t,${D}-0.5),(${D}-t)/0.5,1))',
           format=yuv420p[v]
     " -map "[v]" -r $FPS -c:v libx264 -preset medium -crf 18 -t "$D" "$TMP/clip_$i.mp4"
 done
