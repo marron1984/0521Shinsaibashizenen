@@ -26,12 +26,13 @@ L2=("名物 すき焼き"      "職人の手しごと"     "旨みがあふれ�
 
 N=${#IMAGES[@]}
 
-# ---------- 音声: リポジトリ内の MP3 を BGM に採用 ----------
+# ---------- 音声: リポジトリ内の MP3 を BGM に採用 (軽快・明るめに調整) ----------
 BGM="$ROOT/Midnight_on_the_Terrace.mp3"
+BGM_TEMPO=1.12   # テンポを上げて軽快に (1.0=原曲)
 TOTAL=$(echo "($N - 1) * $STEP + $DL" | bc)
-# 動画尺に満たない場合に備えループ → 全長で切り出し、フェードイン/アウト
+# テンポアップ + 明るめEQ(高音シェルフ/低域抑制) → ループ → 全長で切り出し、フェードイン/アウト
 ffmpeg -y -loglevel error -stream_loop -1 -i "$BGM" \
-  -af "volume=0.85,afade=t=in:st=0:d=1.2,afade=t=out:st=$(echo "$TOTAL - 1.8" | bc):d=1.8,aformat=sample_rates=44100:channel_layouts=stereo" \
+  -af "atempo=${BGM_TEMPO},highpass=f=70,equalizer=f=250:width_type=o:width=1.2:g=-2,treble=g=4:f=3200,equalizer=f=8000:width_type=o:width=1:g=2.5,volume=0.8,alimiter=limit=0.92:attack=5:release=60,afade=t=in:st=0:d=1.0,afade=t=out:st=$(echo "$TOTAL - 1.8" | bc):d=1.8,aformat=sample_rates=44100:channel_layouts=stereo" \
   -t "$TOTAL" "$TMP/music.wav"
 
 # ---------- 動画: 各カットを生成 (ぼかし背景 + フィット + ゆるやかズーム + テロップ) ----------
